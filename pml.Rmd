@@ -1,0 +1,69 @@
+---
+title: "Predicting Quality of Weight Lifting Exercise Using Accelerometer Readings"
+author: "coursera2016"
+output: html_document
+---
+## Executive Summary
+Random forest is applied to build a prediction model to predict how well a subject performs dumbbell lifts. The resulting model has an excellent out-of-sample prediction accuracy of 0.9929, suggesting how well a subject performs dumbbell lifts can be predicted with high accuracy using the readings from 4 accelerometers on the belt, forearm, arm, and dumbell.
+
+## Backgroud
+Wearable devices such as Jawbone Up, Nike FuelBand, and Fitbit can be used to collect a large amount of data about personal activity relatively inexpensively. The data collected by these devices are quantified self movement. Such data can be used to track the users' activity levels, to find patterns in their behavior, and to improve their health.  One thing that people regularly do is to quantify how much of a particular activity they do, but they rarely quantify how well they do it. The goal of this project is to predict how well a subject performs dumbbell lifts using data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+
+## Data
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. Participants were supervised by an experienced weight lifter to make sure the execution complied to the manner they were supposed to simulate. The exercises were performed by six male participants aged between 20-28 years, with little weight lifting experience. A relatively light dumbbell (1.25kg) was used to made sure that all participants could easily simulate the mistakes in a safe and controlled manner.
+
+The training data for this project are available at: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available at: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+Both data files are loaded into R.
+
+```{r}
+pml.dat <- read.csv("pml-training.csv")
+validation <- read.csv("pml-testing.csv")
+```
+
+## Feature Extraction
+The downloaded data contains features derived using a sliding window approach. In each step of the sliding window approach, eight features were calculated for the Euler angles of each of the four sensors. These eight features are mean,  variance, standard deviation, max, min, amplitude, kurtosis and skewness. However, all the data for these derived features are missing in the testing data. Thus these derived features are not used in the model building. The predictive model is built using the raw Euler angles and the raw accelerometer, gyroscope and magnetometer readings of the 4 sensors. The 
+outcome is the classe variable.
+
+```{r}
+TrainingVars <- grep("(^roll|^pitch|^yaw|^total|^gyros|^accel|^magnet|^classe)", colnames(pml.dat))
+pml.dat <- pml.dat[,TrainingVars]
+```
+
+## Model Training
+Random forest is applied to build the prediction model. As the validation data does not contain the classe variable, the original training data is further splited into a training dataset and a testing dataset. The training dataset is used to build the random forest model. A 10-fold cross validation is used within the training dataset to minimize overfitting. As cross validation doesn't eliminate the overfitting problem completely, the testing dataset is used to give a more acurate estimate of out-of-sample error. As the original dataset contains large number of observations, 90% of the observations are assigned to the training dataset and the remaining 10% are assigned to the testing dataset.  
+```{r}
+library(caret)
+set.seed(12345)
+inTrain <-createDataPartition(y=pml.dat$classe, p=0.9, list=FALSE)
+training <- pml.dat[inTrain,]
+testing <- pml.dat[-inTrain,]
+modPred <- train(training$classe ~ ., data=training, method="rf", trControl=trainControl(method="cv"))
+modPred
+```
+
+## Model Testing
+The predition model that is built in the training dataset is tested in the testing dataset. 
+```{r}
+confusionMatrix(predict(modPred, testing), testing$classe)
+```
+The estimated out-of-samples prediction accuracy is 0.9929 (95% CI: (0.988, 0.996)), which is slightly lower than the prediction accuracy obtained in the training data. 
+
+
+## Model Validation
+At the final step, the prediction model is used to predict the 20 test cases in the validation dataset (i.e. the original testing dataset). The accuracy for this set of prediction is 100%.
+```{r}
+classe <- as.factor(rep("A",20))
+validation <- cbind(validation, classe)
+predict(modPred, validation)
+```
+
+## Summary
+Random forest is applied to build a prediction model to predict the class of how well a subjects performs dumbbell lifts, where Class A corresponds to the specified execution of the exercise and the other 4 classes correspond to common mistakes. The resulting model has an excellent out-of-sample prediction accuracy of 0.9929, suggesting how well a subject performs dumbbell lifts can be predicted with high accuracy using the raw Euler angles and the raw accelerometer, gyroscope and magnetometer readings of the 4 sensors on the belt, forearm, arm, and dumbell.
+
